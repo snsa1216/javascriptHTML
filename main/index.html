@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scene</title>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r114/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r114/examples/js/controls/OrbitControls.js"></script>
+    <script src="../js/myThree2020.js"></script>
+    <script src="../js/myGameCharacter.js"></script>
+    <script src="../js/myMaze.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/common.css">
+</head>
+
+<body>
+    <div id="screen" class="screen">
+        <div id="glView" style="position: relative;height: 50%;">
+            <textarea id="debugText" rows="8" cols="20" class="debugText" style="display: none;">Debug output</textarea>
+            <!-- デバッグ用表示を無くしたいときはこちらを有効にする。-->
+            <!--<textarea id="debugText" rows="8" cols="20" class="debugText">Debug output</textarea>-->
+            <button id="startButton" class="startButton" onclick="javascript:init()">
+                Click to Play
+            </button>
+            <div id="status2"
+                style="position: absolute;top: 85%;height: 15%;left: 45%;width: 10%;background-color:transparent;">
+                <div id="EneNum" class="status2" style="left: 50%;width: 100%"></div>
+            </div>
+        </div>
+        <div id="info" style="position: relative;height: 15%;background-color:coral;">
+            <div id="status" class="status" style="width: 20%;"><b>あなた</b><br />hp:20/20<br />勝利数:0</div>
+            <textarea id="message" class="message" style="left: 20%;width: 78%"></textarea>
+        </div>
+
+        <div id="controller" style="position: relative;height: 35%;background-color:rgb(45, 143, 255)">
+            <div id="up" class="gameButton" style="top: 13%; left: 16%; background-image:url(../assets/Button.PNG);">
+            </div>
+            <div id="down" class="gameButton"
+                style="top: 57%; left: 16%; background-image:url(../assets/Button.PNG); transform: rotate(180deg)">
+            </div>
+            <div id="left" class="gameButton"
+                style="top: 35%; left: 3%; background-image:url(../assets/Button.PNG); transform: rotate(-90deg)">
+            </div>
+            <div id="right" class="gameButton"
+                style="top: 35%; left: 29%; background-image:url(../assets/Button.PNG); transform: rotate(90deg)">
+            </div>
+            <!-- プッシュボタンのコード -->
+            <button id="NumC1" type="button" class="pushButton" style="width: 13%;top: 10%; right: 33%;" value="0">
+            </button>
+            <button id="NumC2" type="button" class="pushButton" style="width: 13%;top: 10%; right: 18%;" value="1">
+            </button>
+            <button id="NumC3" type="button" class="pushButton" style="width: 13%;top: 10%; right: 3%;" value="2">
+            </button>
+            <button id="sum" type="button" class="pushButton" style="width: 9%;top: 50%; right: 36%;" value="10">
+                ＋
+            </button>
+            <button id="sub" type="button" class="pushButton" style="width: 9%;top: 50%; right: 25%;" value="11">
+                －
+            </button>
+            <button id="mul" type="button" class="pushButton" style="width: 9%;top: 50%; right: 14%;" value="12">
+                ×
+            </button>
+            <button id="divide" type="button" class="pushButton" style="width: 9%;top: 50%; right: 3%;" value="13">
+                ÷
+            </button>
+            <!-- プッシュボタンのコード -->
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function init() {
+            /* 主要な HTML 要素の取得 */
+            const divScreen = document.getElementById("screen");
+            const divGlView = document.getElementById("glView");
+            const taDebugText = document.getElementById("debugText");
+            divGlView.removeChild(document.getElementById('startButton'));
+
+            /* status2 中央ぞろえ */
+            status2.style.textAlign = "center";
+
+            /* 初期メッセージウィンドウ */
+            message.value = "ここはどこだ…？\n目が覚めると石に囲まれた謎の空間にいた。\n手には7枚のカード…一体何に使うのだろうか？\n\n";
+            message.value += "とりあえずここからでなければ…\nそう思いあなたは立ち上がった。\n";
+
+            /* デバッグ用の出力 */
+            const AUTO_SCROLL_DEBUG = true; // taDebugText を常に最新の行までスクロールさせるかどうか。
+            taDebugText.value = ("ViewPort: " + window.innerWidth + "," + window.innerHeight + "\n");
+
+            /* THREE.js の初期化 */
+            const [scene, camera, renderer, clock, axes] = mylib2020.initThreeInElement(divGlView);
+
+            /* 平面の生成 */
+            const plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshPhongMaterial({ color: 0xCCFFCC }));
+            plane.rotateX(THREE.Math.degToRad(-90)); /* X 軸中心に90度回転 */
+            plane.receiveShadow = true; /* 他の物体の影が落ちる */
+            scene.add(plane);
+
+            /* 球体の生成 */
+            const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.5, 20, 20), new THREE.MeshPhongMaterial({ color: 0x0000FF, wireframe: false }));
+            sphere.position.set(3, 3, 3); /* 座標(3,3,3)に移動 */
+            sphere.castShadow = true; /* 他の物体に影を落とす */
+            scene.add(sphere);
+
+            /* 立方体の生成 */
+            const cubeGeometry = new THREE.BoxGeometry(3, 3, 3); /* Geometry の生成を分けて書くこともできる */
+            const loader = new THREE.TextureLoader(); /* テクスチャをロードするための道具 */
+            const mapTexture = loader.load("../assets/downloads/ColdDungeon.png"); /* 指定されたURLからテクスチャをロード */
+            const bumpTexture = loader.load("../assets/downloads/RockWall_orFloor_height.png"); /* バンプマップ用テクスチャ */
+            const cubeMaterial = new THREE.MeshPhongMaterial({ map: mapTexture, bumpMap: bumpTexture, bumpScale: 0.8 }); /* bumpMap:バンプテクスチャ、bumpScale:バンプマップの深さ */
+            const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+            cube.castShadow = true; /* 他の物体に影を落とす */
+            cube.receiveShadow = true; /* 他の物体から影が落ちる */
+            scene.add(cube);
+
+            /* スポットライトの生成 */
+            const spotLight = new THREE.SpotLight(0xFFFFFF, 0.2, 8); /* 色は白、強さは 1.0から0.2へ */
+            spotLight.angle = THREE.Math.degToRad(55); /* 光源位置から画角90度の円錐状に光を発する */
+            spotLight.penumbra = 0.3; /* 半影をどの程度生じさせるか。 */
+            spotLight.castShadow = true; /* 他の物体に影を落とす */
+            scene.add(spotLight); /* ライト本体と */
+            scene.add(spotLight.target); /* 照射ターゲットもシーンに追加する必要がある */
+
+            /* カメラ等の位置調整 */
+            cube.position.set(0, 1.5, 9); /* 最初にカメラに映るようにしているだけ */
+            sphere.position.set(0, 1.7, 0); /* ジョイスティックによる操作対象 */
+            sphere.castShadow = false; /* 影を消す */
+            camera.position.set(0, 0, 0); /* sphere からの相対位置 */
+            camera.lookAt(0, 0, 1);
+            spotLight.position.set(0, 0.3, -0.5); /* sphere からの相対位置 */
+            spotLight.target.position.set(0, -2, 2); /* sphere からの相対位置 */
+            /* 親子関係の構築 */
+            scene.remove(camera);
+            scene.remove(spotLight);
+            scene.remove(spotLight.target);
+            sphere.add(camera);
+            sphere.add(spotLight);
+            sphere.add(spotLight.target);
+            sphere.position.set(3, 1.7, 3); /* 通行可能領域に自分を移動させている */
+            scene.remove(cube); /* cube はもう必要ない */
+            let blocks = []; /* 迷路を構成するブロックを衝突判定のために保存する必要がある（後述） */
+            let WIDTH = 10; /* 迷路データの幅 */
+            let HEIGHT = 10;  /* 迷路データの高さ */
+            let index = 0;
+            let stage = 0;
+            let score = 0;
+            let enemyBattle = 0;
+            let walknum = 0;
+            stageset(stage);
+
+
+
+            /* サウンド関連 */
+            const audioListener = new THREE.AudioListener();
+            camera.add(audioListener);
+            const sound1 = new THREE.Audio(audioListener);
+            new THREE.AudioLoader().load('../assets/sounds/Footsteps.mp3', function (buffer) {
+                sound1.setBuffer(buffer);
+                sound1.setLoop(false);
+                sound1.setVolume(1.5);
+            });
+            const sound2 = new THREE.Audio(audioListener);
+            new THREE.AudioLoader().load('../assets/sounds/SysEnt.mp3', function (buffer) {
+                sound2.setBuffer(buffer);
+                sound2.setLoop(false);
+                sound2.setVolume(1.5);
+            });
+            const sound3 = new THREE.Audio(audioListener);
+            new THREE.AudioLoader().load('../assets/sounds/Hit.mp3', function (buffer) {
+                sound3.setBuffer(buffer);
+                sound3.setLoop(false);
+                sound3.setVolume(1.5);
+            });
+            const sound4 = new THREE.Audio(audioListener);
+            new THREE.AudioLoader().load('../assets/sounds/Fanfare.mp3', function (buffer) {
+                sound4.setBuffer(buffer);
+                sound4.setLoop(false);
+                sound4.setVolume(1.5);
+            });
+            const sound5 = new THREE.Audio(audioListener);
+            new THREE.AudioLoader().load('../assets/sounds/EndFanfare.mp3', function (buffer) {
+                sound5.setBuffer(buffer);
+                sound5.setLoop(false);
+                sound5.setVolume(1.5);
+            });
+            const sound6 = new THREE.Audio(audioListener);
+            new THREE.AudioLoader().load('../assets/sounds/warp.mp3', function (buffer) {
+                sound6.setBuffer(buffer);
+                sound6.setLoop(false);
+                sound6.setVolume(1.5);
+            });
+            const bgm = new THREE.Audio(audioListener);
+            new THREE.AudioLoader().load('../assets/sounds/bgm1.mp3', function(buffer){
+                bgm.setBuffer(buffer);
+                bgm.setLoop(true);
+                bgm.play(); // ロード完了次第、ループ再生する。
+            });
+            /* bgmに関する箇所 */
+
+            
+
+            /* 数字カードの配列及び乱数の初期設定 */
+            NumC1.value = Math.floor(Math.random() * 9) + 1;
+            NumC1.innerHTML = NumC1.value;
+            NumC2.value = Math.floor(Math.random() * 9) + 1;
+            NumC2.innerHTML = NumC2.value;
+            NumC3.value = Math.floor(Math.random() * 9) + 1;
+            NumC3.innerHTML = NumC3.value;
+
+
+
+
+            /* ↓↓↓プッシュボタンや十字キーに関する追記・修正場所↓↓↓ */
+            let monster = null; // 追記
+            let winCount = 0; // 追記
+            let phase = 0;
+            let calc = 0;
+            let hp = 20;
+            let selnum1 = 0;
+            let selnum2 = 0;
+            let turn = 1;
+
+            
+            
+            function stageset(stagenum) {
+                sphere.position.set(3 + (30 * (stagenum - 1.7)), 1.7, 3); /* 通行可能領域に自分を移動させている */
+                scene.remove(cube); /* cube はもう必要ない */
+                blocks = []; /* 迷路を構成するブロックを衝突判定のために保存する必要がある（後述） */
+                WIDTH = 10; /* 迷路データの幅 */
+                HEIGHT = 10;  /* 迷路データの高さ */
+                index = 0;
+                if(stage <= 1){
+                    new THREE.AudioLoader().load('../assets/sounds/bgm1.mp3', function(buffer){
+                    bgm.setBuffer(buffer);
+                    bgm.setLoop(true);
+                    bgm.play(); // ロード完了次第、ループ再生する。
+                    });
+                }else{
+                    new THREE.AudioLoader().load('../assets/sounds/bgm2.mp3', function(buffer){
+                    bgm.setBuffer(buffer);
+                    bgm.setLoop(true);
+                    bgm.play(); // ロード完了次第、ループ再生する。
+                    });
+                }
+                if (stagenum == 0) {
+                    for (let z = 0; z < HEIGHT; z++) {
+                        for (let x = 0; x < WIDTH; x++) {
+                            let cellType = MyMazeTestData[index];
+                            if (cellType == 1) {
+                                const tmp = new THREE.Mesh(cubeGeometry, cubeMaterial);  /* ブロックを生成 */
+                                tmp.position.set(x * 3 + (30 * (stagenum - 1.7)), 1.5, z * 3);  /* 場所を設定 */
+                                scene.add(tmp); /* シーンに追加 */
+                                blocks.push(tmp); /* 配列に追加 */
+                            } else {
+                                const tmp = new THREE.Mesh(cubeGeometry, cubeMaterial);  /* ブロックを生成 */
+                                tmp.position.set(x * 3 + (30 * (stagenum - 1.7)), -1.4, z * 3);  /* 場所を設定 */
+                                scene.add(tmp); /* シーンに追加 */
+                            }
+                            const tmp = new THREE.Mesh(cubeGeometry, cubeMaterial);  /* ブロックを生成 */
+                            tmp.position.set(x * 3 + (30 * (stagenum - 1.7)), 4.5, z * 3);  /* 場所を設定 */
+                            scene.add(tmp); /* シーンに追加 */
+                            index++;
+                        }
+                    }
+                } else if (stagenum == 1) {
+                    /* HPの初期設定 */
+                    hp = 20
+                    for (let z = 0; z < HEIGHT; z++) {
+                        for (let x = 0; x < WIDTH; x++) {
+                            let cellType = MyMazeTestData2[index];
+                            if (cellType == 1) {
+                                const tmp = new THREE.Mesh(cubeGeometry, cubeMaterial);  /* ブロックを生成 */
+                                tmp.position.set(x * 3 + (30 * (stagenum - 1.7)), 1.5, z * 3);  /* 場所を設定 */
+                                scene.add(tmp); /* シーンに追加 */
+                                blocks.push(tmp); /* 配列に追加 */
+                            } else {
+                                const tmp = new THREE.Mesh(cubeGeometry, cubeMaterial);  /* ブロックを生成 */
+                                tmp.position.set(x * 3 + (30 * (stagenum - 1.7)), -1.4, z * 3);  /* 場所を設定 */
+                                scene.add(tmp); /* シーンに追加 */
+                            }
+                            const tmp = new THREE.Mesh(cubeGeometry, cubeMaterial);  /* ブロックを生成 */
+                            tmp.position.set(x * 3 + (30 * (stagenum - 1.7)), 4.5, z * 3);  /* 場所を設定 */
+                            scene.add(tmp); /* シーンに追加 */
+                            index++;
+                        }
+                    }
+                } else {
+                    hp = 20
+                    for (let z = 0; z < HEIGHT; z++) {
+                        for (let x = 0; x < WIDTH; x++) {
+                            let cellType = MyMazeTestData3[index];
+                            if (cellType == 1) {
+                                const tmp = new THREE.Mesh(cubeGeometry, cubeMaterial);  /* ブロックを生成 */
+                                tmp.position.set(x * 3 + (30 * (stagenum - 1.7)), 1.5, z * 3);  /* 場所を設定 */
+                                scene.add(tmp); /* シーンに追加 */
+                                blocks.push(tmp); /* 配列に追加 */
+                            } else {
+                                const tmp = new THREE.Mesh(cubeGeometry, cubeMaterial);  /* ブロックを生成 */
+                                tmp.position.set(x * 3 + (30 * (stagenum - 1.7)), -1.4, z * 3);  /* 場所を設定 */
+                                scene.add(tmp); /* シーンに追加 */
+                            }
+                            const tmp = new THREE.Mesh(cubeGeometry, cubeMaterial);  /* ブロックを生成 */
+                            tmp.position.set(x * 3 + (30 * (stagenum - 1.7)), 4.5, z * 3);  /* 場所を設定 */
+                            scene.add(tmp); /* シーンに追加 */
+                            index++;
+                        }
+                    }
+                }
+                /*divStatus.innerHTML = "<b>あなた</b><br/>";
+                divStatus.innerHTML += "hp:20/20";
+                divStatus.innerHTML += "<br/>勝利数:" + winCount; */
+            }
+            const divStatus = document.getElementById("status"); // 追記
+            function onPushButtonClicked() {
+                taDebugText.value += this.id + ":Pushed. value=" + this.value + "\n";
+                if (monster) { // 戦闘中
+                    let monsterHand = monster.hp;
+                    let yourHand = parseInt(this.value); // 押されたボタンの value 属性を整数に変換
+                    let nownum = 0;
+                    let uHP = 0;
+                    let win = false;
+                    
+                    while (phase == 2) {
+                        if (this.value <= 9) {
+                            this.value = ((this.value + Math.floor(Math.random() * 8)) % 9) + 1;
+                            this.innerHTML = this.value;
+                            if(sound2.isPlaying){
+                                    sound2.stop();
+                            }
+                            sound2.play();
+                            taMessage.value += yourHand + "を選択した!\n";
+                            phase = 3;
+                            selnum2 = yourHand;
+                        } else {
+                            taMessage.value += "数字カードを選択して下さい\n";
+                            phase += 10;
+                        }
+                    }
+                    while (phase == 1) {
+                        if (this.value >= 10) {
+                            if (this.value == 10) {
+                                taMessage.value += "「＋」を選択した!\n";
+                                calc = 1;
+                                if(sound2.isPlaying){
+                                    sound2.stop();
+                                }
+                                sound2.play();
+                            } else if (this.value == 11) {
+                                taMessage.value += "「－」を選択した!\n";
+                                calc = 2;
+                                if(sound2.isPlaying){
+                                    sound2.stop();
+                                }
+                                sound2.play();
+                            } else if (this.value == 12) {
+                                taMessage.value += "「×」を選択した!\n";
+                                calc = 3;
+                                if(sound2.isPlaying){
+                                    sound2.stop();
+                                }
+                                sound2.play();
+                            } else if (this.value == 13) {
+                                taMessage.value += "「÷」を選択した!\n";
+                                calc = 4;
+                                if(sound2.isPlaying){
+                                    sound2.stop();
+                                }
+                                sound2.play();
+                            }
+                            taMessage.value += "次に数字カードを選択して下さい\n";
+                            phase = 2;
+                        } else {
+                            taMessage.value += "演算カードを選択して下さい\n";
+                            phase += 10;
+                        }
+                    }
+                    while (phase == 0) {
+                        if (this.value <= 9) {
+                            this.value = ((this.value + Math.floor(Math.random() * 8)) % 9) + 1;
+                            this.innerHTML = this.value;
+                            if(sound2.isPlaying){
+                                    sound2.stop();
+                            }
+                            sound2.play();
+                            taMessage.value += yourHand + "を選択した!\n";
+                            taMessage.value += "次に演算カードを選択して下さい\n";
+                            phase = 1;
+                            selnum1 = yourHand;
+                        } else {
+                            taMessage.value += "数字カードを選択して下さい\n";
+                            phase += 10;
+                        }
+                    }
+                    if (phase >= 10) {
+                        phase -= 10;
+                    }
+
+                    if (phase == 3) {
+                        taMessage.value = selnum1;
+                        if (calc == 1) {
+                            taMessage.value += ' ＋ ';
+                            selnum1 = selnum1 + selnum2;
+                        } else if (calc == 2) {
+                            taMessage.value += ' － ';
+                            selnum1 = selnum1 - selnum2;
+                        } else if (calc == 3) {
+                            taMessage.value += ' × ';
+                            selnum1 = selnum1 * selnum2;
+                        } else if (calc == 4) {
+                            taMessage.value += ' ÷ ';
+                            selnum1 = Math.floor(selnum1 / selnum2);
+                        }
+                        taMessage.value += selnum2 + ' ＝ ' + selnum1 + '\n';
+                        if (monster.hp == selnum1) {
+                            taMessage.value += '敵の数字と一致!\n';
+                            win = true;
+                        } else if (hp > 1) {
+                            phase = 1;
+                            taMessage.value += '敵の数字と違う!\n';
+                            if(monster.eID == 7){
+                                hp -= 3;
+                                if(hp < 1){
+                                    hp = 1;
+                                    phase = 3;
+                                }
+                                taMessage.value += '3ダメージ受けた!\n';
+                            }else if (monster.eID == 9){
+                                /* マンドラゴラ用特殊処理 */
+                                if(turn <= 4){
+                                    taMessage.value += monster.name + 'は様子を見ている!\n';
+                                }else{
+                                    taMessage.value += '一撃必殺!\n';
+                                    hp = 1;
+                                    phase = 3;
+                                }
+                            }else if (monster.eID == 11){
+                                /* 魔王用特殊処理 */
+                                hp -= 2;
+                                if(hp < 1){
+                                    hp = 1;
+                                    phase = 3;
+                                }
+                                taMessage.value += '2ダメージ受けた!\n';
+                                if(sound3.isPlaying){
+                                    sound3.stop();
+                                }
+                                sound3.play();
+                            }else{
+                                /* 通常モンスター用攻撃処理 */
+                                hp--;
+                                taMessage.value += '1ダメージ受けた!\n';
+                                if(sound3.isPlaying){
+                                    sound3.stop();
+                                }
+                                sound3.play();
+                            }
+                            taMessage.value += monster.name + 'は' + monster.hp + 'を出している!\n';
+                            if (monster.eID == 4) {
+                                /* スライム　数字カード入れ替え処理 */
+                                taMessage.value += monster.name + "の特殊攻撃!数字カードが入れ替わった!\n";
+                                NumC1.value = Math.floor(Math.random() * 9) + 1;
+                                NumC1.innerHTML = NumC1.value;
+                                NumC2.value = Math.floor(Math.random() * 9) + 1;
+                                NumC2.innerHTML = NumC2.value;
+                                NumC3.value = Math.floor(Math.random() * 9) + 1;
+                                NumC3.innerHTML = NumC3.value;
+                            } else if (monster.eID == 5) {
+                                /* ミミック　数字増加処理 */
+                                selnum2 = Math.floor(Math.random() * 9) + 1;
+                                taMessage.value += monster.name + "の特殊攻撃!現在の数字に" + selnum2 + "がプラス!\n";
+                                selnum1 += selnum2;
+                            } else if (monster.eID == 10) {
+                                /* ビッグフット　数字増加処理 */
+                                selnum2 = 1;
+                                taMessage.value += monster.name + "の特殊攻撃!相手の数字に" + selnum2 + "がプラス!\n";
+                                monster.hp += selnum2;
+                                status2.innerHTML = "<b>Num</b></br>" + monster.hp;
+                            }
+                            turn++;
+                            if(monster.eID == 9 && turn == 5){
+                                /* マンドラゴラ　危険通知 */
+                                taMessage.value += '次のターン　危険!\n';
+                            }
+                            taMessage.value += '現在の数字は' + selnum1 + "!\n";
+                            taMessage.value += "次に演算カードを選択して下さい\n";
+                            divStatus.innerHTML = "<b>あなた</b><br/>";
+                            divStatus.innerHTML += "hp:" + hp + "/20";
+                            divStatus.innerHTML += "<br/>勝利数:" + winCount;
+                        } else {
+
+                        }
+                    }
+
+                    /* 勝利後処理 */
+
+                    if (win) {
+                        sound4.play();
+                        uHP = monster.hpRec;
+                        taMessage.value += monster.name + "を倒した!!\nHPを" + uHP + "回復した!";
+                        winCount++;
+                        hp += uHP;
+                        enemyBattle += uHP;
+                        if (hp > 20) {
+                            enemyBattle += hp - 20;
+                            hp = 20;
+                        }
+                        monster.remove(divGlView);
+                        monster = null;
+                        /* ステータス表示更新 */
+                        divStatus.innerHTML = "<b>あなた</b><br/>";
+                        divStatus.innerHTML += "hp:" + hp + "/20";
+                        divStatus.innerHTML += "<br/>勝利数:" + winCount;
+                        phase = 0;
+                        selnum1 = 0;
+                        status2.innerHTML = "";
+                        status2.style.backgroundColor = 'transparent';
+                        bgm.stop();
+                        /* ビッグフット　数字増加処理 */
+                        if(stage <= 1){
+                            new THREE.AudioLoader().load('../assets/sounds/bgm1.mp3', function(buffer){
+                            bgm.setBuffer(buffer);
+                            bgm.setLoop(true);
+                            bgm.play(); // ロード完了次第、ループ再生する。
+                            });
+                        }else{
+                            new THREE.AudioLoader().load('../assets/sounds/bgm2.mp3', function(buffer){
+                            bgm.setBuffer(buffer);
+                            bgm.setLoop(true);
+                            bgm.play(); // ロード完了次第、ループ再生する。
+                            });
+                        }
+                    } else if (phase == 3 && hp == 1) {
+                        /* 敗戦処理 */
+                        divStatus.innerHTML = "<b>あなた</b><br/>";
+                        divStatus.innerHTML += "hp:0/20";
+                        divStatus.innerHTML += "<br/>勝利数:" + winCount;
+                        taMessage.value = "あなたは敗れ去った・・・再読み込みしてください。\n";
+                        phase = 4;
+                    }
+                }
+            }
+            let elems = document.getElementsByClassName("pushButton"); // class 属性に pushButton が指定してある HTML 要素を取得し、配列 elems に格納する。
+            for (let e of elems) {
+                e.addEventListener("click", onPushButtonClicked);
+            }
+            elems = document.getElementsByClassName("gameButton"); // class 属性に gameButton が指定された HTML 要素を全て取得し、配列に格納する。
+            const arrows = {}; // div の id と十字キーボタンクラスをペアとする辞書
+            for (let e of elems) {
+                arrows[e.id] = new mylib2020.ArrowButton(e, "url(../assets/Button_Pushed.png)");
+                /* 十字キーボタンを生成する。第一引数はボタン領域となる HTML の div 要素、第二引数は押したときの画像 */
+            }
+            /* ↑↑↑プッシュボタンや十字キーに関する追記・修正場所↑↑↑ */
+
+            /* アニメーションのための描画更新処理 */
+            const LINEAR = 3; // 追記 3m/sec
+            const ANGULAR = THREE.Math.degToRad(60); // 追記 60deg/sec
+            const ENCOUNTER = 0.003;
+            let degsin = 0;
+            let deg = 55;
+            cameradeg = 0;
+            const taMessage = document.getElementById("message");
+            function renderFrame() {
+                const deltaTime = clock.getDelta(); /* 前フレームからの経過時間。物体の移動に使う。 */
+                const ran = Math.random();
+                const EnemyRandID = Math.floor(Math.random() * 100) + 1 + winCount;
+                let enc = false;
+                if (monster == null && stage != 3) {
+                    if (arrows["up"].isPressed()) {
+                        degsin += 0.1;
+                        deg = 55 - (Math.sin(degsin) * 10);
+                        cameradeg = Math.sin(degsin * 1.6) * 0.1;
+                        walknum += 0.05;
+                        taDebugText.value += "up\n";
+                        if (mylib2020.checkCollision(sphere, blocks, mylib2020.FORWARD) == false && stage != 3) {
+                            sphere.translateOnAxis(mylib2020.FORWARD, LINEAR * deltaTime);
+                            if (!sound1.isPlaying) {
+                                sound1.play();
+                            }
+                            if (sphere.position.x >= (28 + (30 * (stage - 1.7)))) {
+                                taMessage.value = 'ステージ' + (stage + 1) + 'クリア!\n';
+                                stage++;
+                                if (stage <= 2) {
+                                    taMessage.value += 'ステージ' + (stage + 1) + 'へ移動します!\n';
+                                    bgm.stop();
+                                    sound6.play();
+                                    stageset(stage);
+                                }else{
+                                    score = (100 * enemyBattle) - (parseInt(walknum * 5));
+                                    if(score < 0){
+                                        score = 0;
+                                    }
+                                    taMessage.value += 'ゲームクリア!\nおめでとうございます!!\n\n';
+                                    taMessage.value += '今回のあなたのスコアは ' + score + ' 点です!\n\n';
+                                    taMessage.value += '再読み込みで再度ゲームを開始できます\n';
+                                    bgm.stop();
+                                    sound5.play();
+                                }
+                            }
+                            enc = ran < ENCOUNTER;
+                        }
+                    }
+                    if (arrows["down"].isPressed()) {
+                        degsin += 0.1;
+                        deg = 55 - (Math.sin(degsin) * 10);
+                        cameradeg = Math.sin(degsin * 1.6) * 0.1;
+                        walknum += 0.05;
+                        taDebugText.value += "down\n";
+                        if (mylib2020.checkCollision(sphere, blocks, mylib2020.BACK) == false && stage != 3) {
+                            sphere.translateOnAxis(mylib2020.BACK, LINEAR * deltaTime);
+                            if (!sound1.isPlaying) {
+                                sound1.play();
+                            }
+                            if (sphere.position.x >= (28 + (30 * (stage - 1.7)))) {
+                                taMessage.value = 'ステージ' + (stage + 1) + 'クリア!\n';
+                                stage++;
+                                if (stage <= 2) {
+                                    taMessage.value += 'ステージ' + (stage + 1) + 'へ移動します!\n';
+                                    bgm.stop();
+                                    sound6.play();
+                                    stageset(stage);
+                                }else{
+                                    score = (100 * enemyBattle) - (parseInt(walknum * 5));
+                                    if(score < 0){
+                                        score = 0;
+                                    }
+                                    taMessage.value += 'ゲームクリア!\nおめでとうございます!!\n\n';
+                                    taMessage.value += '今回のあなたのスコアは ' + score + ' 点です!\n\n';
+                                    taMessage.value += '再読み込みで再度ゲームを開始できます\n';
+                                    bgm.stop();
+                                    sound5.play();
+                                }
+                            }
+                            enc = ran < ENCOUNTER;
+                        }
+                    }
+                    if (arrows["left"].isPressed()) {
+                        taDebugText.value += "left\n";
+                        sphere.rotateY(ANGULAR * deltaTime); //追記
+                    }
+                    if (arrows["right"].isPressed()) {
+                        taDebugText.value += "right\n";
+                        sphere.rotateY(-ANGULAR * deltaTime); //追記
+                    }
+                    if(!arrows["up"].isPressed() && !arrows["down"].isPressed()){
+                        degsin = 0;
+                        deg = 55;
+                    }
+                    if(!arrows["up"].isPressed() && !arrows["down"].isPressed() && sound1.isPlaying){
+                        sound1.stop();
+                    }
+                }
+                if(monster != null && sound1.isPlaying){
+                    sound1.stop();
+                }
+                if (enc) {
+                    taDebugText.value += "Encounter!!\n";
+                    bgm.stop();
+                    new THREE.AudioLoader().load('../assets/sounds/battle.mp3', function(buffer){
+                        bgm.setBuffer(buffer);
+                        bgm.setLoop(true);
+                        bgm.play(); // ロード完了次第、ループ再生する。
+                    });
+                    if (stage == 0) {
+                        if (EnemyRandID >= 1 && EnemyRandID <= 50) {
+                            monster = new MyGameCharacter('恐竜', '../assets/downloads/Tyrannosaurus.png', Math.floor(Math.random() * (20 + (winCount * 2))) + 1, 1, 3); // 追記
+                        } else if (EnemyRandID >= 51 && EnemyRandID <= 61) {
+                            monster = new MyGameCharacter('おばけ', '../assets/downloads/halloween_chara7_obake.png', 0 - (Math.floor(Math.random() * 20 + 1)), 2, 3);
+                        } else if (EnemyRandID >= 62 && EnemyRandID <= 72) {
+                            monster = new MyGameCharacter('コブラ', '../assets/downloads/animal_hebi_cobra.png', 10 * (Math.floor(Math.random() * 10 + 1)), 3, 4);
+                        } else if (EnemyRandID >= 73 && EnemyRandID <= 83) {
+                            monster = new MyGameCharacter('スライム', '../assets/downloads/fantasy_game_character_slime.png', (Math.floor(Math.random() * 30 + 1)), 4, 3);
+                        } else if (EnemyRandID >= 84 && EnemyRandID <= 94) {
+                            monster = new MyGameCharacter('ミミック', '../assets/downloads/character_game_mimic.png', (Math.floor(Math.random() * 40 + 1)), 5, 3);
+                        } else if (EnemyRandID >= 95) {
+                            monster = new MyGameCharacter('ゴーレム', '../assets/downloads/fantasy_golem.png', (Math.floor(Math.random() * 50 + 1)), 6, 4);
+                        }
+                    }else if(stage == 1){
+                        if (EnemyRandID >= 1 && EnemyRandID <= 40) {
+                            monster = new MyGameCharacter('恐竜', '../assets/downloads/Tyrannosaurus.png', Math.floor(Math.random() * (20 + (winCount * 2))) + 1, 1, 3);
+                        } else if (EnemyRandID >= 41 && EnemyRandID <= 50) {
+                            monster = new MyGameCharacter('おばけ', '../assets/downloads/halloween_chara7_obake.png', 0 - (Math.floor(Math.random() * 20 + 1)), 2, 3);
+                        } else if (EnemyRandID >= 51 && EnemyRandID <= 60) {
+                            monster = new MyGameCharacter('コブラ', '../assets/downloads/animal_hebi_cobra.png', 10 * (Math.floor(Math.random() * 10 + 1)), 3, 4);
+                        } else if (EnemyRandID >= 61 && EnemyRandID <= 70) {
+                            monster = new MyGameCharacter('スライム', '../assets/downloads/fantasy_game_character_slime.png', (Math.floor(Math.random() * 40 + 1)), 4, 3);
+                        } else if (EnemyRandID >= 71 && EnemyRandID <= 80) {
+                            monster = new MyGameCharacter('ゴーレム', '../assets/downloads/fantasy_golem.png', (Math.floor(Math.random() * 50 + 1)), 6, 4);
+                        } else if (EnemyRandID >= 81 && EnemyRandID <= 90) {
+                            monster = new MyGameCharacter('バーサーカー', '../assets/downloads/fantasy_berserker.png', 10, 7, 5);
+                        } else if (EnemyRandID >= 91 && EnemyRandID <= 100) {
+                            monster = new MyGameCharacter('赤鬼', '../assets/downloads/setsubun_oni_kowai.png',Math.floor(Math.random() * 7 + 2), 8, 4);
+                        } else if (EnemyRandID >= 101) {
+                            monster = new MyGameCharacter('マンドラゴラ', '../assets/downloads/fantasy_mandrake_mandragora.png',Math.floor(Math.random() * 10 + 21), 9, 4);
+                        }
+                    }else if(stage == 2){
+                        if (EnemyRandID >= 1 && EnemyRandID <= 50) {
+                            monster = new MyGameCharacter('おばけ', '../assets/downloads/halloween_chara7_obake.png', 0 - (Math.floor(Math.random() * 40 + 1)), 2, 3);
+                        } else if (EnemyRandID >= 51 && EnemyRandID <= 60) {
+                            monster = new MyGameCharacter('恐竜', '../assets/downloads/Tyrannosaurus.png', Math.floor(Math.random() * (30 + (winCount * 2))) + 1, 1, 3);
+                        } else if (EnemyRandID >= 61 && EnemyRandID <= 70) {
+                            monster = new MyGameCharacter('バーサーカー', '../assets/downloads/fantasy_berserker.png', 10, 7, 5);
+                        } else if (EnemyRandID >= 71 && EnemyRandID <= 80) {
+                            monster = new MyGameCharacter('赤鬼', '../assets/downloads/setsubun_oni_kowai.png',Math.floor(Math.random() * 7 + 2), 8, 4);
+                        } else if (EnemyRandID >= 81 && EnemyRandID <= 90) {
+                            monster = new MyGameCharacter('マンドラゴラ', '../assets/downloads/fantasy_mandrake_mandragora.png',Math.floor(Math.random() * 10 + 21), 9, 4);
+                        } else if (EnemyRandID >= 91 && EnemyRandID <= 100) {
+                            monster = new MyGameCharacter('ビッグフット', '../assets/downloads/uma_bigfoot.png',Math.floor(Math.random() * (30 + (winCount * 3))) + 1, 10, 5);
+                        } else if (EnemyRandID >= 101 && EnemyRandID <= 110) {
+                            monster = new MyGameCharacter('ゴーレム', '../assets/downloads/fantasy_golem.png', (Math.floor(Math.random() * 50 + 1)), 6, 4);
+                        } else if (EnemyRandID >= 111) {
+                            monster = new MyGameCharacter('魔王', '../assets/downloads/fantasy_maou_devil.png', Math.floor(Math.random() * (10 + (winCount * 5))) + 100, 11, 7);
+                        }
+                    }
+                    taMessage.value = monster.name + 'と遭遇した\n'; // 追記
+                    monster.show(divGlView); // 追記 //敵の数字をランダムに生成
+                    turn = 1;
+                    if (monster.eID == 6) {
+                        /* ゴーレム　カード強制書き換え */
+                        taMessage.value += monster.name + 'の特殊効果! 数字カードの数字が1～3に!\n';
+                        NumC1.value = Math.floor(Math.random() * 3) + 1;
+                        NumC1.innerHTML = NumC1.value;
+                        NumC2.value = Math.floor(Math.random() * 3) + 1;
+                        NumC2.innerHTML = NumC2.value;
+                        NumC3.value = Math.floor(Math.random() * 3) + 1;
+                        NumC3.innerHTML = NumC3.value;
+                    }else if (monster.eID == 8) {
+                        /* 赤鬼　カード強制書き換え */
+                        taMessage.value += monster.name + 'の特殊効果! 数字カードの数字が9に!\n';
+                        NumC1.value = 9;
+                        NumC1.innerHTML = NumC1.value;
+                        NumC2.value = 9;
+                        NumC2.innerHTML = NumC2.value;
+                        NumC3.value = 9;
+                        NumC3.innerHTML = NumC3.value;
+                    }
+                    taMessage.value += monster.name + 'は ' + monster.hp + ' を出している!\n';
+                    status2.style.backgroundColor = 'skyblue';
+                    status2.innerHTML = "<b>Num</b></br>" + monster.hp;
+                }
+                renderer.render(scene, camera);
+                requestAnimationFrame(renderFrame);
+                if (AUTO_SCROLL_DEBUG) {
+                    taDebugText.scrollTop = taDebugText.scrollHeight;
+                
+                }
+                spotLight.angle = THREE.Math.degToRad(deg);
+                camera.position.set(camera.position.x, cameradeg, camera.position.z);
+            }
+            
+            renderFrame();
+
+            /* 画面サイズ変更時の処理 */
+            window.addEventListener('resize', function () {
+                taDebugText.value += ("ViewPort: " + window.innerWidth + "," + window.innerHeight + "\n");
+                const glViewSize = divGlView.getBoundingClientRect();
+                renderer.setSize(glViewSize.width, glViewSize.height);
+                camera.aspect = glViewSize.width / glViewSize.height;
+                camera.updateProjectionMatrix();
+            });
+        }
+        /* window.addEventListener('load', init); */
+    </script>
+</body>
